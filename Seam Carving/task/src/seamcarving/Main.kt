@@ -71,18 +71,6 @@ class DPPathcalculator(private val handler: ImageHandler): IPathCalculator{
         }
     }
 
-    private fun findPixelNeighbors(pixel: Point): Array<Point>{
-        val neighbors: MutableList<Point> = mutableListOf()
-        for(x in pixel.first-1 .. pixel.first+1){
-            for(y in pixel.second-1 .. pixel.second+1){
-                neighbors.add(Point(x,y))
-            }
-        }
-        neighbors.remove(pixel)
-
-        return neighbors.filter { it.second >= -1 && it.second <= handler.image.height && it.first >= 0 && it.first <= handler.image.width - 1}.toTypedArray()
-    }
-
     private fun buildShortestPath(from:Point, to: Point): Array<Point>{
         val path: MutableList<Point> = mutableListOf()
         var current: Point = pixelDistances.filterKeys { it.second == handler.image.height - 1 }.minByOrNull { it.value.cost }?.key ?: throw Exception("Could not define first point to build path")
@@ -105,35 +93,48 @@ class ImageHandler{
     private var height by Delegates.notNull<Int>()
 
     lateinit var image: BufferedImage
-    lateinit var baseImage: BufferedImage
-    lateinit var transposedImage: BufferedImage
 
     private lateinit var energyImage: BufferedImage
     private lateinit var imageName: String
 
     private var maxEnergy: Double = 0.0
-    private val energyMatrix: MutableList<MutableList<Double>> = mutableListOf()
+    private var energyMatrix: MutableList<MutableList<Double>> = mutableListOf()
     private var pathStrategy: IPathCalculator = DPPathcalculator(this)
 
 
 
-    fun reduce()
-
-
-    fun execute(inputImage:String, outputImage: String){
+    fun reduce(inputImage:String, outputImage: String, widthToReduce: Int, heightToReduce: Int){
         imageName = outputImage
         readInputImage(inputImage)
-        transposeImage()
-        image = transposedImage
         calculateImageEnergyMatrix()
-        findSeam()
-        transposeImage(transposedImage)
-        image = transposedImage
+        reduceImage(widthToReduce)
+        //image = transposeImage(image)
+        //reduceImage(heightToReduce)
         saveImage()
     }
 
-    private fun transposeImage(refImage: BufferedImage = baseImage){
-        transposedImage = BufferedImage(refImage.height, refImage.width, refImage.type)
+    private fun reduceImage(times: Int){
+        repeat(times){
+            val pathToReduce = findSeam()
+            executeImageReduction(pathToReduce)
+            calculateImageEnergyMatrix()
+        }
+    }
+
+    private fun executeImageReduction(path: Array<Point>, axis: Int = 0){
+        val newImage = if(axis == 0) BufferedImage(image.width -1, image.height, image.type) else BufferedImage(image.width, image.height -1, image.type)
+        for(y in 0 until image.height){
+            var rgb = IntArray(image.width)
+            rgb = image.getRGB(0,y, image.width, 1, rgb, 0, 1)
+            val rgbList = rgb.toMutableList()
+            rgbList.removeAt(path[y].first)
+            newImage.setRGB(0,y, newImage.width, 1, rgbList.toIntArray(), 0, 1)
+        }
+        image = newImage
+    }
+
+    private fun transposeImage(refImage: BufferedImage): BufferedImage{
+        val transposedImage = BufferedImage(refImage.height, refImage.width, refImage.type)
 
         for (x in 0 until transposedImage.width) {
             for (y in 0 until transposedImage.height) {
@@ -141,6 +142,7 @@ class ImageHandler{
             }
         }
 
+        return transposedImage
     }
 
     fun energyTransformation(inputImage:String, outputImage: String){
@@ -150,11 +152,8 @@ class ImageHandler{
         executeEnergyTransformation()
     }
 
-    private fun findSeam(){
-        val path = pathStrategy.calculate()
-        for (point in path){
-            image.setRGB(point.first, point.second, 16711680)
-        }
+    private fun findSeam(): Array<Point>{
+        return pathStrategy.calculate()
     }
 
     private fun executeEnergyTransformation(){
@@ -172,11 +171,12 @@ class ImageHandler{
         val imageFile = File(fileLocation)
 
         if(imageFile.exists()){
-            baseImage = ImageIO.read(imageFile)
+            image = ImageIO.read(imageFile)
         }
     }
 
     private fun calculateImageEnergyMatrix(){
+        energyMatrix = mutableListOf()
         for(x in 0 until image.width){
             energyMatrix.add(mutableListOf())
             for(y in 0 until image.height){
@@ -310,8 +310,8 @@ fun main(args: Array<String>) {
     val inputImage = args[1]
     val outputImage = args[3]
 
-    val widthToReduce = args[4]
-    val heightToReduce = args[5]
+    val widthToReduce = args[5].toInt()
+    val heightToReduce = args[7].toInt()
 
     imageHandler.reduce(inputImage, outputImage, widthToReduce, heightToReduce)
 }
