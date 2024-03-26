@@ -105,6 +105,9 @@ class ImageHandler{
     private var height by Delegates.notNull<Int>()
 
     lateinit var image: BufferedImage
+    lateinit var baseImage: BufferedImage
+    lateinit var transposedImage: BufferedImage
+
     private lateinit var energyImage: BufferedImage
     private lateinit var imageName: String
 
@@ -113,13 +116,31 @@ class ImageHandler{
     private var pathStrategy: IPathCalculator = DPPathcalculator(this)
 
 
+
+    fun reduce()
+
+
     fun execute(inputImage:String, outputImage: String){
         imageName = outputImage
         readInputImage(inputImage)
+        transposeImage()
+        image = transposedImage
         calculateImageEnergyMatrix()
-        executeEnergyTransformation()
         findSeam()
+        transposeImage(transposedImage)
+        image = transposedImage
         saveImage()
+    }
+
+    private fun transposeImage(refImage: BufferedImage = baseImage){
+        transposedImage = BufferedImage(refImage.height, refImage.width, refImage.type)
+
+        for (x in 0 until transposedImage.width) {
+            for (y in 0 until transposedImage.height) {
+                transposedImage.setRGB(x,y, refImage.getRGB(y,x))
+            }
+        }
+
     }
 
     fun energyTransformation(inputImage:String, outputImage: String){
@@ -151,7 +172,7 @@ class ImageHandler{
         val imageFile = File(fileLocation)
 
         if(imageFile.exists()){
-            image = ImageIO.read(imageFile)
+            baseImage = ImageIO.read(imageFile)
         }
     }
 
@@ -289,5 +310,8 @@ fun main(args: Array<String>) {
     val inputImage = args[1]
     val outputImage = args[3]
 
-    imageHandler.execute(inputImage, outputImage)
+    val widthToReduce = args[4]
+    val heightToReduce = args[5]
+
+    imageHandler.reduce(inputImage, outputImage, widthToReduce, heightToReduce)
 }
