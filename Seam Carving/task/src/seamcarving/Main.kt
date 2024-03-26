@@ -4,7 +4,6 @@ import java.awt.image.BufferedImage
 import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import javax.imageio.ImageIO
-import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.properties.Delegates
@@ -15,34 +14,24 @@ interface IPathCalculator{
     fun calculate(): Array<Point>
 }
 
-class DijkstraArray(private val handler: ImageHandler): IPathCalculator{
-    private val pixelDistances: MutableMap<Point, Double> = mutableMapOf()
-    private var unprocessedPixels: MutableList<Point> = mutableListOf()
+data class PixelInfo(val cost: Double, val backtrack: Point)
+
+class DPPathcalculator(private val handler: ImageHandler): IPathCalculator{
+    private val pixelDistances: MutableMap<Point, PixelInfo> = mutableMapOf()
     private val initialPoint = Point(0, -1)
 
     override fun calculate(): Array<Point> {
-        mapPixels(handler.image)
-        //processPixels()
         dynamicProcessPixels()
         return buildShortestPath(initialPoint, Point(handler.image.width -1, handler.image.height))
     }
 
-    private fun mapPixels(image: BufferedImage){
-        for (x in 0 until image.width){
-            unprocessedPixels.add(Point(x,-1))
-            for(y in 0 .. image.height){
-                unprocessedPixels.add(Point(x,y))
-            }
-        }
-    }
-
-    private fun calcMinCost(pixel: Point): Double{
+    private fun calcMinCost(pixel: Point): PixelInfo{
         if(pixel.second == 0 && pixel.first >= 0 && pixel.first < handler.image.width){
-            return getPixelEnergy(pixel)
+            return PixelInfo(getPixelEnergy(pixel), pixel)
         }
 
         if(pixel.first == -1 || pixel.first == handler.image.width){
-            return Double.MAX_VALUE
+            return PixelInfo(Double.MAX_VALUE, Point(Int.MAX_VALUE,Int.MAX_VALUE))
         }
 
         val p1 = Point(pixel.first - 1, pixel.second -1)
@@ -53,72 +42,33 @@ class DijkstraArray(private val handler: ImageHandler): IPathCalculator{
         val v2 = pixelDistances.getOrElse(p2) {calcMinCost(p2)}
         val v3 = pixelDistances.getOrElse(p3) {calcMinCost(p3)}
 
-        val minVal = arrayOf(v1,v2,v3).minOf { it }
+        val minVal = arrayOf(Pair(p1,v1),Pair(p2,v2),Pair(p3,v3)).minByOrNull { it.second.cost }
 
-        return getPixelEnergy(pixel) + minVal
+        val minCost: Double = minVal?.second?.cost ?: throw Exception("Min Cost Not Found")
+        val minPixel: Point = minVal.first
+
+        return PixelInfo( getPixelEnergy(pixel) + minCost, minPixel)
     }
 
     private fun dynamicProcessPixels(){
-        for(x in 0 until  handler.image.width ){
-            for(y in 0 until handler.image.height){
+        for(y in 0 until  handler.image.height ){
+            for(x in 0 until handler.image.width){
                 pixelDistances[Point(x, y)] = pixelDistances.getOrElse(Point(x,y)) {calcMinCost(Point(x,y))}
             }
         }
     }
 
-    // private fun processPixels(){
-    //     pixelDistances[initialPoint] = 0.0
-    //     while (unprocessedPixels.isNotEmpty()){
-    //         val currentPixel = findSmallestDistPixel()
-    //         val currentPixelEnergy = pixelDistances.getOrElse(currentPixel) { throw Exception("Pixel Not found") }.distance
-    //         unprocessedPixels.remove(currentPixel)
-    //         val neighbors = findPixelNeighbors(currentPixel)
-    //         pixelDistances[currentPixel]?.neighbors = neighbors
-//
-    //         for(neighbor in neighbors){
-    //             try {
-    //                 val neighborEnergy = getPixelEnergy(neighbor)
-    //                 val newDistance = currentPixelEnergy + neighborEnergy
-    //                 val  neighborInfo = pixelDistances.getOrDefault(neighbor, NodeInfo(Double.MAX_VALUE, arrayOf()))
-    //                 val oldDistance = neighborInfo.distance
-    //                 if(newDistance < oldDistance) {
-    //                     neighborInfo.distance = newDistance
-    //                     pixelDistances[neighbor] = neighborInfo
-    //                 }
-    //             }catch (e: NeighborNotFoundException){
-    //                 continue
-    //             }
-    //         }
-    //     }
-    // }
-
-    //private fun findSmallestDistPixel(pixelList: MutableList<Point> = unprocessedPixels):Point{
-    //    var minDistance = Double.MAX_VALUE
-    //    var minPoint: Point? = null
-
-    //    for (pixel in pixelList){
-    //        val currentDistance = pixelDistances.getOrDefault(pixel, NodeInfo(Double.MAX_VALUE, arrayOf())).distance
-    //        if(currentDistance <= minDistance){
-    //            minPoint = pixel
-    //            minDistance = currentDistance
-    //        }
-    //    }
-
-    //    if(minPoint == null) throw Exception("Min Distance Pixel not found")
-    //    return minPoint
-    //}
-
     private fun getPixelEnergy(pixel: Point): Double{
         return try {
-            if(pixel.first < 0 || pixel.first > handler.image.height ) throw NeighborNotFoundException("Neighbor not found")
+            if(pixel.first < 0 || pixel.first > handler.image.width ) throw NeighborNotFoundException("Neighbor not found")
             when(pixel.second){
-            -1 -> 0.0
-            handler.image.height -> 0.0
-            else -> handler.getPixelEnergy(pixel)
+                -1 -> 0.0
+                handler.image.height -> 0.0
+                else -> handler.getPixelEnergy(pixel)
             }
-            } catch (e: IndexOutOfBoundsException){
-                throw NeighborNotFoundException("Neighbor not found")
-            }
+        } catch (e: IndexOutOfBoundsException){
+            throw NeighborNotFoundException("Neighbor not found")
+        }
     }
 
     private fun findPixelNeighbors(pixel: Point): Array<Point>{
@@ -133,49 +83,16 @@ class DijkstraArray(private val handler: ImageHandler): IPathCalculator{
         return neighbors.filter { it.second >= -1 && it.second <= handler.image.height && it.first >= 0 && it.first <= handler.image.width - 1}.toTypedArray()
     }
 
-    //private fun buildShortestPath(from:Point, to: Point): Array<Point>{
-    //    val path: MutableList<Point> = mutableListOf()
-    //    var current = to
-    //    while (current != from){
-    //        var smallestNeighbor: Point? = null
-    //        var smallestNeighborDistance = Double.MAX_VALUE
-    //        for(neighbor in pixelDistances.getOrDefault(current, NodeInfo(Double.MAX_VALUE, arrayOf())).neighbors){
-    //            val neighborDistance = pixelDistances.getOrDefault(neighbor, NodeInfo(Double.MAX_VALUE, arrayOf())).distance
-    //            if(neighborDistance < smallestNeighborDistance){
-    //                smallestNeighbor = neighbor
-    //                smallestNeighborDistance = neighborDistance
-    //            }
-    //        }
-    //        if(smallestNeighbor == null) throw Exception("Wasn't able to find smallest neighbor while building shortest path")
-    //        path.add(smallestNeighbor)
-    //        current = smallestNeighbor
-    //    }
-    //    path.add(to)
-    //    path.reverse()
-    //    return path.filter { it.second > -1 && it.second < handler.image.height }.toTypedArray()
-    //}
-
     private fun buildShortestPath(from:Point, to: Point): Array<Point>{
         val path: MutableList<Point> = mutableListOf()
-        var current: Point = pixelDistances.filterKeys { it.second == handler.image.height - 1 }.minByOrNull { it.value }?.key ?: throw Exception("Could not define first point to build path")
+        var current: Point = pixelDistances.filterKeys { it.second == handler.image.height - 1 }.minByOrNull { it.value.cost }?.key ?: throw Exception("Could not define first point to build path")
+        path.add(current)
         while (current.second != 0){
-            var smallestNeighbor: Point? = null
-            var smallestNeighborDistance = Double.MAX_VALUE
-            val neighbors = findPixelNeighbors(current)
-            for(neighbor in neighbors){
-                val neighborDistance = pixelDistances.getOrDefault(neighbor, Double.MAX_VALUE)
-                if(neighborDistance < smallestNeighborDistance){
-                    smallestNeighbor = neighbor
-                    smallestNeighborDistance = neighborDistance
-                }
-            }
-            if(smallestNeighbor == null) throw Exception("Wasn't able to find smallest neighbor while building shortest path")
+            val smallestNeighbor = pixelDistances[current]?.backtrack ?: throw Exception("Unable to Backtrack")
             path.add(smallestNeighbor)
             current = smallestNeighbor
         }
-        path.add(to)
-        path.reverse()
-        return path.filter { it.second > -1 && it.second < handler.image.height }.toTypedArray()
+        return path.toTypedArray()
     }
 
 }
@@ -193,7 +110,7 @@ class ImageHandler{
 
     private var maxEnergy: Double = 0.0
     private val energyMatrix: MutableList<MutableList<Double>> = mutableListOf()
-    private var pathStrategy: IPathCalculator = DijkstraArray(this)
+    private var pathStrategy: IPathCalculator = DPPathcalculator(this)
 
 
     fun execute(inputImage:String, outputImage: String){
