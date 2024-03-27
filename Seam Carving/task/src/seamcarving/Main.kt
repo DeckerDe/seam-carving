@@ -109,11 +109,11 @@ class ImageHandler{
         readInputImage(inputImage)
         calculateImageEnergyMatrix()
         reduceImage(widthToReduce)
-        image = transposeImage(image)
-        pathStrategy = DPPathcalculator(this)
-        calculateImageEnergyMatrix()
-        reduceImage(heightToReduce)
-        image = transposeImage(image)
+        //image = transposeImage(image)
+        //pathStrategy = DPPathcalculator(this)
+        //calculateImageEnergyMatrix()
+        //reduceImage(heightToReduce)
+        //image = transposeImage(image)
         saveImage()
     }
 
@@ -123,7 +123,7 @@ class ImageHandler{
             for (point in pathToReduce){
                 image.setRGB(point.first, point.second, 16711680)
             }
-            executeImageReduction(pathToReduce)
+            //executeImageReduction(pathToReduce)
             calculateImageEnergyMatrix()
         }
     }
@@ -319,8 +319,8 @@ fun main(args: Array<String>) {
     val inputImage = args[1]
     val outputImage = args[3]
 
-    val widthToReduce = args[5].toInt()
-    val heightToReduce = args[7].toInt()
+    //val widthToReduce = args[5].toInt()
+    //val heightToReduce = args[7].toInt()
 
-    imageHandler.reduce(inputImage, outputImage, widthToReduce, heightToReduce)
+    imageHandler.reduce(inputImage, outputImage, 1,1)//widthToReduce, heightToReduce)
 }
