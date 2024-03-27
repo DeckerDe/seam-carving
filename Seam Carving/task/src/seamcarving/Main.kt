@@ -21,6 +21,7 @@ class DPPathcalculator(private val handler: ImageHandler): IPathCalculator{
     private val initialPoint = Point(0, -1)
 
     override fun calculate(): Array<Point> {
+        pixelDistances.clear()
         dynamicProcessPixels()
         return buildShortestPath(initialPoint, Point(handler.image.width -1, handler.image.height))
     }
@@ -109,11 +110,11 @@ class ImageHandler{
         readInputImage(inputImage)
         calculateImageEnergyMatrix()
         reduceImage(widthToReduce)
-        //image = transposeImage(image)
-        //pathStrategy = DPPathcalculator(this)
-        //calculateImageEnergyMatrix()
-        //reduceImage(heightToReduce)
-        //image = transposeImage(image)
+        image = transposeImage(image)
+        pathStrategy = DPPathcalculator(this)
+        calculateImageEnergyMatrix()
+        reduceImage(heightToReduce)
+        image = transposeImage(image)
         saveImage()
     }
 
@@ -123,7 +124,7 @@ class ImageHandler{
             for (point in pathToReduce){
                 image.setRGB(point.first, point.second, 16711680)
             }
-            //executeImageReduction(pathToReduce)
+            executeImageReduction(pathToReduce)
             calculateImageEnergyMatrix()
         }
     }
@@ -186,6 +187,7 @@ class ImageHandler{
 
     private fun calculateImageEnergyMatrix(){
         energyMatrix = mutableListOf()
+        maxEnergy = 0.0
         for(x in 0 until image.width){
             energyMatrix.add(mutableListOf())
             for(y in 0 until image.height){
@@ -319,8 +321,8 @@ fun main(args: Array<String>) {
     val inputImage = args[1]
     val outputImage = args[3]
 
-    //val widthToReduce = args[5].toInt()
-    //val heightToReduce = args[7].toInt()
+    val widthToReduce = args[5].toInt()
+    val heightToReduce = args[7].toInt()
 
-    imageHandler.reduce(inputImage, outputImage, 1,1)//widthToReduce, heightToReduce)
+    imageHandler.reduce(inputImage, outputImage, widthToReduce, heightToReduce)
 }
