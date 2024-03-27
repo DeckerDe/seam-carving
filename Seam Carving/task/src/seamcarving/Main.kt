@@ -80,6 +80,7 @@ class DPPathcalculator(private val handler: ImageHandler): IPathCalculator{
             path.add(smallestNeighbor)
             current = smallestNeighbor
         }
+        path.reverse()
         return path.toTypedArray()
     }
 
@@ -108,27 +109,35 @@ class ImageHandler{
         readInputImage(inputImage)
         calculateImageEnergyMatrix()
         reduceImage(widthToReduce)
-        //image = transposeImage(image)
-        //reduceImage(heightToReduce)
+        image = transposeImage(image)
+        pathStrategy = DPPathcalculator(this)
+        calculateImageEnergyMatrix()
+        reduceImage(heightToReduce)
+        image = transposeImage(image)
         saveImage()
     }
 
     private fun reduceImage(times: Int){
         repeat(times){
             val pathToReduce = findSeam()
+            for (point in pathToReduce){
+                image.setRGB(point.first, point.second, 16711680)
+            }
             executeImageReduction(pathToReduce)
             calculateImageEnergyMatrix()
         }
     }
 
-    private fun executeImageReduction(path: Array<Point>, axis: Int = 0){
-        val newImage = if(axis == 0) BufferedImage(image.width -1, image.height, image.type) else BufferedImage(image.width, image.height -1, image.type)
+    private fun executeImageReduction(path: Array<Point>){
+        val newImage = BufferedImage(image.width -1, image.height, image.type)
         for(y in 0 until image.height){
-            var rgb = IntArray(image.width)
-            rgb = image.getRGB(0,y, image.width, 1, rgb, 0, 1)
-            val rgbList = rgb.toMutableList()
-            rgbList.removeAt(path[y].first)
-            newImage.setRGB(0,y, newImage.width, 1, rgbList.toIntArray(), 0, 1)
+            for(x in 0 until image.width){
+                val xToIgnore = path[y].first
+                when{
+                    x < xToIgnore -> newImage.setRGB(x, y, image.getRGB(x,y))
+                    x > xToIgnore -> newImage.setRGB(x -1, y, image.getRGB(x,y))
+                }
+            }
         }
         image = newImage
     }
